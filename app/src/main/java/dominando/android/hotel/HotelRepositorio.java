@@ -4,6 +4,8 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.support.v4.content.CursorLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,46 +15,29 @@ import java.util.List;
  */
 public class HotelRepositorio {
 
-    private HotelSQLHelper helper;
+    private Context ctx;
 
     public HotelRepositorio(Context ctx) {
-        helper = new HotelSQLHelper(ctx);
+        this.ctx = ctx;
     }
 
     private long inserir(Hotel hotel){
-        SQLiteDatabase db = helper.getWritableDatabase();
-
-        ContentValues cv = new ContentValues();
-
-        cv.put(HotelSQLHelper.COLUNA_NOME, hotel.nome);
-        cv.put(HotelSQLHelper.COLUNA_ENDERECO, hotel.endereco);
-        cv.put(HotelSQLHelper.COLUNA_ESTRELAS, hotel.estrelas);
-
-        long id = db.insert(HotelSQLHelper.TABELA_HOTEL, null, cv);
+        Uri uri = ctx.getContentResolver().insert(
+                HotelProvider.CONTENT_URI,
+                getValues(hotel));
+        long id = Long.parseLong(uri.getLastPathSegment());
         if (id != -1){
             hotel.id = id;
         }
-        db.close();
+
         return id;
     }
 
     private int atualizar (Hotel hotel){
-        SQLiteDatabase db = helper.getWritableDatabase();
+        Uri uri = Uri.withAppendedPath(
+                HotelProvider.CONTENT_URI, String.valueOf(hotel.id));
+        int linhasAfetadas = ctx.getContentResolver().update(uri, getValues(hotel), null, null);
 
-        ContentValues cv = new ContentValues();
-
-        cv.put(HotelSQLHelper.COLUNA_ID, hotel.id);
-        cv.put(HotelSQLHelper.COLUNA_NOME, hotel.nome);
-        cv.put(HotelSQLHelper.COLUNA_ENDERECO, hotel.endereco);
-        cv.put(HotelSQLHelper.COLUNA_ESTRELAS, hotel.estrelas);
-
-        int linhasAfetadas = db.update(
-                HotelSQLHelper.TABELA_HOTEL,
-                cv,
-                HotelSQLHelper.COLUNA_ID + " = ?",
-                new String[]{String.valueOf(hotel.id)}
-        );
-        db.close();
         return linhasAfetadas;
     }
 
@@ -65,48 +50,50 @@ public class HotelRepositorio {
     }
 
     public int excluir(Hotel hotel){
-        SQLiteDatabase db = helper.getWritableDatabase();
-        int linhasAfetadas = db.delete(
-                HotelSQLHelper.TABELA_HOTEL,
-                HotelSQLHelper.COLUNA_ID +" = ?",
-                new String[]{ String.valueOf(hotel.id)});
-        db.close();
+        Uri uri = Uri.withAppendedPath(HotelProvider.CONTENT_URI, String.valueOf(hotel.id));
+        int linhasAfetadas = ctx.getContentResolver().delete(uri, null, null);
         return linhasAfetadas;
     }
 
-    public List<Hotel> buscarHotel(String filtro){
-        SQLiteDatabase db = helper.getWritableDatabase();
-
-        String sql = "SELECT * FROM "+ HotelSQLHelper.TABELA_HOTEL;
-        String[] argumentos = null;
-        if(filtro != null){
-            sql += " WHERE "+ HotelSQLHelper.COLUNA_NOME +" LIKE ?";
-            argumentos = new String[]{ filtro };
+    public CursorLoader buscar(Context ctx, String s){
+        String where = null;
+        String[] whereArgs = null;
+        if (s != null){
+            where = HotelSQLHelper.COLUNA_NOME +" LIKE ?";
+            whereArgs = new String[]{ "%" + s + "%"};
         }
-        sql += " ORDER BY "+ HotelSQLHelper.COLUNA_NOME;
+        return new CursorLoader(
+                ctx,
+                HotelProvider.CONTENT_URI,
+                null,
+                where,
+                whereArgs,
+                HotelSQLHelper.COLUNA_NOME);
+    }
 
-        Cursor cursor = db.rawQuery(sql,argumentos);
+    private ContentValues getValues(Hotel hotel){
+        ContentValues cv = new ContentValues();
+        cv.put(HotelSQLHelper.COLUNA_NOME, hotel.nome);
+        cv.put(HotelSQLHelper.COLUNA_ENDERECO, hotel.endereco);
+        cv.put(HotelSQLHelper.COLUNA_ESTRELAS, hotel.estrelas);
+        return cv;
+    }
 
-        List<Hotel> hoteis = new ArrayList<>();
-        while (cursor.moveToNext()){
-            long id = cursor.getLong(
-                    cursor.getColumnIndex(
-                            HotelSQLHelper.COLUNA_ID));
-            String nome = cursor.getString(
-                    cursor.getColumnIndex(
-                            HotelSQLHelper.COLUNA_NOME));
-            String endereco = cursor.getString(
-                    cursor.getColumnIndex(
-                            HotelSQLHelper.COLUNA_ENDERECO));
-            float estrelas = cursor.getFloat(
-                    cursor.getColumnIndex(
-                            HotelSQLHelper.COLUNA_ESTRELAS));
-            Hotel hotel = new Hotel(id, nome, endereco, estrelas);
-            hoteis.add(hotel);
-        }
-        cursor.close();
-        db.close();
+    public static Hotel hotelFromCursor(Cursor cursor){
+        long id = cursor.getLong(
+                cursor.getColumnIndex(HotelSQLHelper.COLUNA_ID)
+        );
+        String nome = cursor.getString(
+                cursor.getColumnIndex(HotelSQLHelper.COLUNA_NOME)
+        );
+        String endereco = cursor.getString(
+                cursor.getColumnIndex(HotelSQLHelper.COLUNA_ENDERECO)
+        );
+        float estrelas = cursor.getFloat(
+                cursor.getColumnIndex(HotelSQLHelper.COLUNA_ESTRELAS)
+        );
 
-        return hoteis;
+        Hotel hotel = new Hotel(id, nome, endereco, estrelas);
+        return hotel;
     }
 }
