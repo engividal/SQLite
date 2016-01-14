@@ -1,23 +1,32 @@
 package dominando.android.hotel;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ListFragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.Loader;
+import android.support.v4.content.LocalBroadcastManager;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.view.ActionMode;
 import android.text.TextUtils;
 import android.util.SparseBooleanArray;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CursorAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,11 +39,23 @@ import java.util.List;
 public class HotelListFragment extends ListFragment
         implements ActionMode.Callback,
         AdapterView.OnItemLongClickListener,
-        LoaderManager.LoaderCallbacks<Cursor>{
+        LoaderManager.LoaderCallbacks<Cursor>,
+        SwipeRefreshLayout.OnRefreshListener{
     ListView mListView;
     ActionMode mActionMode;
     CursorAdapter mAdapter;
     String mTextoBusca;
+    SwipeRefreshLayout mSwipeLayout;
+
+    BroadcastReceiver mServiceReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            mSwipeLayout.setRefreshing(false);
+            if (!intent.getBooleanExtra(HotelIntentService.EXTRA_SUCESSO, false)){
+                Toast.makeText(getActivity(), R.string.erro_sincronizacao, Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
 
     HotelRepositorio mRepositorio;
 
@@ -42,6 +63,24 @@ public class HotelListFragment extends ListFragment
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
+
+        IntentFilter filter = new IntentFilter(HotelIntentService.ACAO_SINCRONIZAR);
+        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mServiceReceiver, filter);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(mServiceReceiver);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        View layout = inflater.inflate(R.layout.fragment_list_hotel, null);
+        mSwipeLayout = (SwipeRefreshLayout) layout.findViewById(R.id.swipe_container);
+        mSwipeLayout.setOnRefreshListener(this);
+        mSwipeLayout.setColorSchemeResources(R.color.colorPrimary, R.color.colorAccent, R.color.colorPrimaryDark);
+        return layout;
     }
 
     @Override
@@ -140,8 +179,8 @@ public class HotelListFragment extends ListFragment
                     @Override
                     public void onClick(View v) {
                         for (Hotel hotel:hoteisExcluidos){
-                            hotel.id = 0;
-                            mRepositorio.salvar(hotel);
+                            hotel.status = Hotel.Status.ATUALIZAR;
+                            mRepositorio.inserirLocal(hotel, getActivity().getContentResolver());
                         }
                         limparBusca();
                     }
@@ -214,6 +253,12 @@ public class HotelListFragment extends ListFragment
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
         mAdapter.swapCursor(null);
+    }
+
+    @Override
+    public void onRefresh() {
+        Intent it = new Intent(getActivity(), HotelIntentService.class);
+        getActivity().startService(it);
     }
 
     public interface AoClicarNoHotel {

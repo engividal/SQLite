@@ -1,5 +1,6 @@
 package dominando.android.hotel;
 
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -22,22 +23,14 @@ public class HotelRepositorio {
     }
 
     private long inserir(Hotel hotel){
-        Uri uri = ctx.getContentResolver().insert(
-                HotelProvider.CONTENT_URI,
-                getValues(hotel));
-        long id = Long.parseLong(uri.getLastPathSegment());
-        if (id != -1){
-            hotel.id = id;
-        }
-
+        hotel.status = Hotel.Status.INSERIR;
+        long id = inserirLocal(hotel, ctx.getContentResolver());
         return id;
     }
 
     private int atualizar (Hotel hotel){
-        Uri uri = Uri.withAppendedPath(
-                HotelProvider.CONTENT_URI, String.valueOf(hotel.id));
-        int linhasAfetadas = ctx.getContentResolver().update(uri, getValues(hotel), null, null);
-
+        hotel.status = Hotel.Status.ATUALIZAR;
+        int linhasAfetadas = atualizarLocal(hotel, ctx.getContentResolver());
         return linhasAfetadas;
     }
 
@@ -50,8 +43,8 @@ public class HotelRepositorio {
     }
 
     public int excluir(Hotel hotel){
-        Uri uri = Uri.withAppendedPath(HotelProvider.CONTENT_URI, String.valueOf(hotel.id));
-        int linhasAfetadas = ctx.getContentResolver().delete(uri, null, null);
+        hotel.status = Hotel.Status.EXCLUIR;
+        int linhasAfetadas = atualizarLocal(hotel, ctx.getContentResolver());
         return linhasAfetadas;
     }
 
@@ -76,6 +69,10 @@ public class HotelRepositorio {
         cv.put(HotelSQLHelper.COLUNA_NOME, hotel.nome);
         cv.put(HotelSQLHelper.COLUNA_ENDERECO, hotel.endereco);
         cv.put(HotelSQLHelper.COLUNA_ESTRELAS, hotel.estrelas);
+        cv.put(HotelSQLHelper.COLUNA_STATUS, hotel.status.ordinal());
+        if(hotel.idServidor != 0){
+            cv.put(HotelSQLHelper.COLUNA_ID_SERVIDOR, hotel.idServidor);
+        }
         return cv;
     }
 
@@ -92,8 +89,37 @@ public class HotelRepositorio {
         float estrelas = cursor.getFloat(
                 cursor.getColumnIndex(HotelSQLHelper.COLUNA_ESTRELAS)
         );
+        int status = cursor.getInt(cursor.getColumnIndex(
+                HotelSQLHelper.COLUNA_STATUS
+        ));
+        long idServidor = cursor.getLong(cursor.getColumnIndex(
+                HotelSQLHelper.COLUNA_ID_SERVIDOR
+        ));
 
-        Hotel hotel = new Hotel(id, nome, endereco, estrelas);
+        Hotel hotel = new Hotel(id, nome, endereco, estrelas,
+                idServidor, Hotel.Status.values()[status]);
         return hotel;
+    }
+
+    public long inserirLocal(Hotel hotel, ContentResolver cr){
+        Uri uri = cr.insert(
+                HotelProvider.CONTENT_URI, getValues(hotel));
+        long id = Long.parseLong(uri.getLastPathSegment());
+        if (id != -1){
+            hotel.id = id;
+        }
+        return id;
+    }
+
+    public int atualizarLocal(Hotel hotel, ContentResolver cr){
+        Uri uri = Uri.withAppendedPath(HotelProvider.CONTENT_URI, String.valueOf(hotel.id));
+        int linhasAfetadas = cr.update(uri, getValues(hotel), null, null);
+        return linhasAfetadas;
+    }
+
+    public int excluirLocal(Hotel hotel, ContentResolver cr){
+        Uri uri = Uri.withAppendedPath(HotelProvider.CONTENT_URI, String.valueOf(hotel.id));
+        int linhasAfetadas = cr.delete(uri, null, null);
+        return linhasAfetadas;
     }
 }

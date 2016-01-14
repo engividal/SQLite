@@ -17,6 +17,7 @@
     <string name="acao_compartilhar">Compartilhar</string>
     <string name="texto_compartilhar">Me hospedei no %1$s e o classifiquei em %2$.1f estrelas</string>
     <string name="acao_editar">Editar</string>
+    <string name="erro_sincronizacao">Erro ao sincronizar com o servidor.</string>
     <plurals name="numero_selecionados">
         <item quantity="one">1 selecionado</item>
         <item quantity="other">%d selecionados</item>

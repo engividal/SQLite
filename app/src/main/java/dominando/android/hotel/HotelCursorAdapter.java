@@ -31,6 +31,13 @@ public class HotelCursorAdapter extends CursorAdapter {
 
         rtbEstrelas.setRating(cursor.getFloat(cursor.getColumnIndex(HotelSQLHelper.COLUNA_ESTRELAS)));
         txtMessage.setText(cursor.getString(cursor.getColumnIndex(HotelSQLHelper.COLUNA_NOME)));
+
+        int status = cursor.getInt(cursor.getColumnIndex(HotelSQLHelper.COLUNA_STATUS));
+        if (status == Hotel.Status.EXCLUIR.ordinal()){
+            txtMessage.setTextColor(Color.RED);
+        } else {
+            txtMessage.setTextColor(Color.BLACK);
+        }
     }
 
     @Override
